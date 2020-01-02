@@ -14,7 +14,8 @@
     "prepublish": "tsc"
   },
   "dependencies": {
-    "discord.js": "^11.5.1"
+    "discord.js": "^11.5.1",
+    "ulid": "^2.3.0"
   },
   "devDependencies": {
     "@types/node": "^13.1.2",

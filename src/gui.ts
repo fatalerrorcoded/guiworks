@@ -3,12 +3,30 @@ import Discord from "discord.js";
 import Guiworks from "./extension";
 
 export default class Gui {
-    private instance: Guiworks | undefined;
-    init(instance: Guiworks) {
-        this.instance = instance;
+    private _instance: Guiworks | undefined;
+    private _id: string | undefined;
+    init(instance: Guiworks, id: string) {
+        this._instance = instance;
+        this._id = id;
+    }
+
+    get id(): string {
+        if (!this._id) return "";
+        return this._id;
+    }
+
+    terminate() { if (this._instance) this._instance.remove(this); }
+
+    isParticipating(user: Discord.User): boolean { return true; }
+    targetReactions(): Array<Discord.Emoji | Discord.ReactionEmoji> { return []; }
+
+    update(event: any) {
+        throw new Error("Gui needs to be extended, it cannot be used directly");
     }
 
     render(): Discord.RichEmbed {
         throw new Error("Gui needs to be extended, it cannot be used directly");
     }
+
+    destroy() {}
 }
