@@ -1,0 +1,19 @@
+{
+  "name": "guiworks",
+  "version": "0.1.0",
+  "description": "A React-style Discord.js library for interactive embeds",
+  "main": "dist/index.js",
+  "author": "Martin Löffler <me@fatalerrorcoded.eu> (https://fatalerrorcoded.eu/)",
+  "repository": "https://github.com/fatalerrorcoded/guiworks.git",
+  "license": "MIT",
+  "private": false,
+  "directories": {
+    "lib": "dist"
+  },
+  "scripts": {
+    "prepublish": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^3.7.4"
+  }
+}
