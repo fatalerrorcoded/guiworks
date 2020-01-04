@@ -5,5 +5,10 @@ import Gui from "./gui";
 export default interface GuiState {
     gui: Gui,
     message: Discord.Message,
-    lastEmbed: Discord.RichEmbed,
+
+    lastRender: {
+        time: Date,
+        embed: Discord.RichEmbed
+    },
+    awaitingRender: boolean,
 }

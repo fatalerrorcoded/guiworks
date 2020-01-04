@@ -10,10 +10,29 @@ export default class Guiworks {
     instancesByMsg: Collection<string, GuiState>;
     instancesByGui: Collection<string, GuiState>;
 
-    constructor(client: Discord.Client) {
+    renderTimeDifferential: number;
+    rerenderInterval: NodeJS.Timeout;
+
+    constructor(client: Discord.Client, params?: { renderTimeDiff?: number, rerenderInterval?: number }) {
         this.client = client;
         this.instancesByMsg = new Collection();
         this.instancesByGui = new Collection();
+
+        if (params && params.renderTimeDiff !== undefined) this.renderTimeDifferential = params.renderTimeDiff;
+        else this.renderTimeDifferential = 5000;
+        
+        let rerenderInterval;
+        if (params && params.rerenderInterval !== undefined) rerenderInterval = params.rerenderInterval;
+        else rerenderInterval = this.renderTimeDifferential / 2;
+
+        this.rerenderInterval = setInterval(() => {
+            const currentTime = new Date().getTime();
+            for (let state of this.instancesByGui) {
+                if (state[1].awaitingRender
+                    && currentTime >= state[1].lastRender.time.getTime() + this.renderTimeDifferential)
+                    this.triggerRender(state[1].gui);
+            }
+        }, rerenderInterval);
 
         this.add = this.add.bind(this);
         this.remove = this.remove.bind(this);
@@ -27,12 +46,13 @@ export default class Guiworks {
     }
 
     async add(channel: Discord.TextBasedChannelFields, gui: Gui) {
-        gui.init(this, ulid());
+        gui.guiworksInit(this, ulid());
+        gui.initialize();
         const embed = gui.render();
 
         let message = await channel.send("", { embed });
         if (message instanceof Array) message = message[0];
-        const state: GuiState = { gui, message, lastEmbed: embed };
+        const state: GuiState = { gui, message, lastRender: { embed, time: new Date() }, awaitingRender: false};
 
         this.instancesByMsg.set(message.id, state);
         this.instancesByGui.set(gui.id, state);
@@ -51,7 +71,7 @@ export default class Guiworks {
     remove(gui: Gui, deleteMessage?: boolean) {
         const state = this.instancesByGui.get(gui.id);
         if (state === undefined) return;
-        gui.destroy();
+        gui.finalize();
         this.instancesByGui.delete(state.gui.id);
         this.instancesByMsg.delete(state.message.id);
         if (deleteMessage === true) state.message.delete();
@@ -60,10 +80,18 @@ export default class Guiworks {
     triggerRender(gui: Gui) {
         const state = this.instancesByGui.get(gui.id);
         if (state === undefined) return;
+        if (new Date().getTime() < state.lastRender.time.getTime() + this.renderTimeDifferential) {
+            state.awaitingRender = true;
+            this.updateLists(state);
+            return;
+        }
+
         try {
             const embed = gui.render();
-            if (compareEmbeds(embed, state.lastEmbed)) return;
-            state.lastEmbed = embed;
+            if (compareEmbeds(embed, state.lastRender.embed)) return;
+            state.lastRender = { embed, time: new Date() };
+            state.awaitingRender = false;
+            this.updateLists(state);
             state.message.edit("", { embed });
         } catch (err) {
             console.error(err);
@@ -82,9 +110,14 @@ export default class Guiworks {
         });
         state.message.clearReactions().catch(() => {});
 
-        state.gui.destroy();
+        state.gui.finalize();
         this.instancesByGui.delete(state.gui.id);
         this.instancesByMsg.delete(state.message.id);
+    }
+
+    private updateLists(state: GuiState) {
+        this.instancesByGui.set(state.gui.id, state);
+        this.instancesByMsg.set(state.message.id, state);
     }
 
     onReactionAdd(reaction: Discord.MessageReaction, user: Discord.User) {
@@ -104,20 +137,25 @@ export default class Guiworks {
     onReactionRemove(reaction: Discord.MessageReaction, user: Discord.User) {
         const state = this.instancesByMsg.get(reaction.message.id);
         if (state === undefined) return;
-        if (user.id === this.client.user.id
-            && state.gui.targetReactions().find((value) => {
+        if (state.gui.targetReactions().find((value) => {
                 if (typeof value === "string") return value === reaction.emoji.name;
                 else return value.id === reaction.emoji.id;
             })
         ) {
-                reaction.message.react(reaction.emoji);
+            if (state.gui.isParticipating(user) && !user.bot) {
+                state.gui.update({ type: "reactionRemove", reaction, user });
+                this.triggerRender(state.gui);
+            }
+            else if (user.id === this.client.user.id) {
+                    reaction.message.react(reaction.emoji);
+            }
         }
     }
 
     onMessageDelete(message: Discord.Message) {
         const state = this.instancesByMsg.get(message.id);
         if (state === undefined) return;
-        state.gui.destroy();
+        state.gui.finalize();
         this.instancesByGui.delete(state.gui.id);
         this.instancesByMsg.delete(message.id);
     }

@@ -6,7 +6,7 @@ export default class Gui {
     private _instance: Guiworks | undefined;
     private _id: string | undefined;
     constructor() {}
-    init(instance: Guiworks, id: string) {
+    guiworksInit(instance: Guiworks, id: string) {
         this._instance = instance;
         this._id = id;
     }
@@ -22,6 +22,8 @@ export default class Gui {
     isParticipating(user: Discord.User): boolean { return true; }
     targetReactions(): Array<string | Discord.Emoji | Discord.ReactionEmoji> { return []; }
 
+    initialize() {}
+
     update(event: any) {
         throw new Error("Gui needs to be extended, it cannot be used directly");
     }
@@ -30,5 +32,5 @@ export default class Gui {
         throw new Error("Gui needs to be extended, it cannot be used directly");
     }
 
-    destroy() {}
+    finalize() {}
 }
