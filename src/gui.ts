@@ -24,6 +24,7 @@ export default class Gui {
     targetReactions(): Array<string | Discord.Emoji | Discord.ReactionEmoji> { return []; }
 
     initialize() {}
+    finalize() {}
 
     update(event: GuiEvent) {
         throw new Error("Gui needs to be extended, it cannot be used directly");
@@ -33,5 +34,5 @@ export default class Gui {
         throw new Error("Gui needs to be extended, it cannot be used directly");
     }
 
-    finalize() {}
+    automaticRender(): number | undefined { return undefined; }
 }

@@ -28,9 +28,14 @@ export default class Guiworks {
         this.rerenderInterval = setInterval(() => {
             const currentTime = new Date().getTime();
             for (let state of this.instancesByGui) {
-                if (state[1].awaitingRender
-                    && currentTime >= state[1].lastRender.time.getTime() + this.renderTimeDifferential)
-                    this.triggerRender(state[1].gui);
+                if (state[1].awaitingRender) {
+                    if (currentTime >= state[1].lastRender.time.getTime() + this.renderTimeDifferential)
+                        this.triggerRender(state[1].gui);
+                } else {
+                    let automaticRender = state[1].gui.automaticRender();
+                    if (automaticRender && currentTime >= state[1].lastRender.time.getTime() + automaticRender)
+                        this.triggerRender(state[1].gui);
+                }
             }
         }, rerenderInterval);
 
