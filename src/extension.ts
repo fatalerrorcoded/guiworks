@@ -5,6 +5,9 @@ import Gui from "./gui";
 import GuiState from "./guistate";
 import { compareEmbeds } from "./utils";
 
+/**
+ * The main Guiworks class
+ */
 export default class Guiworks {
     client: Discord.Client;
     instancesByMsg: Collection<string, GuiState>;
@@ -25,14 +28,18 @@ export default class Guiworks {
         if (params && params.rerenderInterval !== undefined) rerenderInterval = params.rerenderInterval;
         else rerenderInterval = this.renderTimeDifferential / 2;
 
+        // Interval for re-renders and periodic renders
         this.rerenderInterval = setInterval(() => {
             const currentTime = new Date().getTime();
             for (let state of this.instancesByGui) {
+                // If we are awaiting a render...
                 if (state[1].awaitingRender) {
+                    // check if more than X milliseconds have passed, if so, render
                     if (currentTime >= state[1].lastRender.time.getTime() + this.renderTimeDifferential)
                         this.triggerRender(state[1].gui);
                 } else {
                     let automaticRender = state[1].gui.automaticRender();
+                    // Check if the Gui has an automatic render and if it should've triggered by now
                     if (automaticRender && currentTime >= state[1].lastRender.time.getTime() + automaticRender)
                         this.triggerRender(state[1].gui);
                 }
@@ -50,18 +57,27 @@ export default class Guiworks {
         client.on('messageDelete', this.onMessageDelete);
     }
 
+    /**
+     * Initializes and registers a Gui instance with this Guiworks instance
+     * @param channel The channel where the Gui should be sent
+     * @param gui The Gui instance to initialize and register
+     */
     async add(channel: Discord.TextBasedChannelFields, gui: Gui) {
+        // Initialize GUI
         gui.guiworksInit(this, ulid());
         gui.initialize();
         const embed = gui.render();
 
+        // Send message
         let message = await channel.send("", { embed });
         if (message instanceof Array) message = message[0];
-        const state: GuiState = { gui, message, lastRender: { embed, time: new Date() }, awaitingRender: false};
 
+        // Configure state
+        const state: GuiState = { gui, message, lastRender: { embed, time: new Date() }, awaitingRender: false};
         this.instancesByMsg.set(message.id, state);
         this.instancesByGui.set(gui.id, state);
 
+        // Add reactions
         (async () => {
             let emotes = gui.targetReactions();
             for (let emote of emotes) {
@@ -73,19 +89,40 @@ export default class Guiworks {
         });
     }
 
+    /**
+     * Finalizes a Gui and removes it from this Guiworks instance
+     * Rerenders the Gui a final time after finalizing it but before it's removed from the Guiworks instance if the message is not deleted
+     * @param gui The Gui instance to finalize
+     * @param deleteMessage If the message should be deleted
+     */
     remove(gui: Gui, deleteMessage?: boolean) {
         const state = this.instancesByGui.get(gui.id);
         if (state === undefined) return;
         gui.finalize();
         this.instancesByGui.delete(state.gui.id);
         this.instancesByMsg.delete(state.message.id);
-        if (deleteMessage === true) state.message.delete();
+        if (deleteMessage === true) state.message.delete().catch(() => {});
+        else {
+            try {
+                state.message.clearReactions();
+                state.message.edit("", state.gui.render());
+            } catch (err) {
+                console.error(err);
+                this.guiError(state);
+            }
+        }
     }
 
+    /**
+     * Triggers a re-render of a Gui instance
+     * @param gui The Gui instance to re-render
+     */
     triggerRender(gui: Gui) {
         const state = this.instancesByGui.get(gui.id);
         if (state === undefined) return;
+        // Check if it's less than X milliseconds past the last render
         if (new Date().getTime() < state.lastRender.time.getTime() + this.renderTimeDifferential) {
+            // If so, we "await" the render as a rate limit to not abuse the Discord API
             state.awaitingRender = true;
             this.updateLists(state);
             return;
@@ -93,7 +130,9 @@ export default class Guiworks {
 
         try {
             const embed = gui.render();
+            // Compare the embeds to check if we do need to render or not
             if (compareEmbeds(embed, state.lastRender.embed)) return;
+            // Set state and edit the message
             state.lastRender = { embed, time: new Date() };
             state.awaitingRender = false;
             this.updateLists(state);
@@ -125,9 +164,10 @@ export default class Guiworks {
         this.instancesByMsg.set(state.message.id, state);
     }
 
-    onReactionAdd(reaction: Discord.MessageReaction, user: Discord.User) {
+    private onReactionAdd(reaction: Discord.MessageReaction, user: Discord.User) {
         const state = this.instancesByMsg.get(reaction.message.id);
         if (state === undefined) return;
+        // Check if the user is participating and if the reaction is on the target reactions list
         if (state.gui.isParticipating(user) && !user.bot
             && state.gui.targetReactions().find((value) => {
                 if (typeof value === "string") return value === reaction.emoji.name;
@@ -139,25 +179,29 @@ export default class Guiworks {
         }
     }
 
-    onReactionRemove(reaction: Discord.MessageReaction, user: Discord.User) {
+    private onReactionRemove(reaction: Discord.MessageReaction, user: Discord.User) {
         const state = this.instancesByMsg.get(reaction.message.id);
         if (state === undefined) return;
+        // Check if the reaction is on the target reaction
         if (state.gui.targetReactions().find((value) => {
                 if (typeof value === "string") return value === reaction.emoji.name;
                 else return value.id === reaction.emoji.id;
             })
         ) {
+            // If the user is participating, push an update
             if (state.gui.isParticipating(user) && !user.bot) {
                 state.gui.update({ type: "reactionRemove", reaction, user });
                 this.triggerRender(state.gui);
             }
+            // Check if the bot's reaction has been removed while it's on the target reaction list
             else if (user.id === this.client.user.id) {
-                    reaction.message.react(reaction.emoji);
+                // If so, re-add it
+                reaction.message.react(reaction.emoji);
             }
         }
     }
 
-    onMessageDelete(message: Discord.Message) {
+    private onMessageDelete(message: Discord.Message) {
         const state = this.instancesByMsg.get(message.id);
         if (state === undefined) return;
         state.gui.finalize();

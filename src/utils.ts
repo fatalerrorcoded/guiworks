@@ -6,6 +6,7 @@ import Discord from "discord.js";
  * @param second The second embed
  */
 const compareEmbeds = (first: Discord.RichEmbed, second: Discord.RichEmbed): boolean => {
+    // Yes I know that these can most likely be shortened by like a lot
     if (first.author !== second.author) return false;
     if (first.color !== second.color) return false;
     if (first.description !== second.description) return false;
