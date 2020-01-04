@@ -5,6 +5,7 @@ import Guiworks from "./extension";
 export default class Gui {
     private _instance: Guiworks | undefined;
     private _id: string | undefined;
+    constructor() {}
     init(instance: Guiworks, id: string) {
         this._instance = instance;
         this._id = id;
@@ -15,10 +16,11 @@ export default class Gui {
         return this._id;
     }
 
+    triggerRender() { if (this._instance) this._instance.triggerRender(this); }
     terminate() { if (this._instance) this._instance.remove(this); }
 
     isParticipating(user: Discord.User): boolean { return true; }
-    targetReactions(): Array<Discord.Emoji | Discord.ReactionEmoji> { return []; }
+    targetReactions(): Array<string | Discord.Emoji | Discord.ReactionEmoji> { return []; }
 
     update(event: any) {
         throw new Error("Gui needs to be extended, it cannot be used directly");
