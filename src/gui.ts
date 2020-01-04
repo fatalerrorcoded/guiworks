@@ -1,6 +1,7 @@
 import Discord from "discord.js";
 
 import Guiworks from "./extension";
+import GuiEvent from "./guievent";
 
 export default class Gui {
     private _instance: Guiworks | undefined;
@@ -24,7 +25,7 @@ export default class Gui {
 
     initialize() {}
 
-    update(event: any) {
+    update(event: GuiEvent) {
         throw new Error("Gui needs to be extended, it cannot be used directly");
     }
 
